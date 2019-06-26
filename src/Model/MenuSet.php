@@ -67,7 +67,7 @@ class MenuSet extends DataObject implements PermissionProvider
 
     private static $summary_fields = [
         'Name',
-        'MenuItems.Count' => 'Items'
+        'Items.Count' => 'Items'
     ];
 
     private static $default_sort = 'Sort';

@@ -124,15 +124,6 @@ class MenuItem extends SuperLink
         return false;
     }
 
-    public function onBeforeWrite()
-    {
-        parent::onBeforeWrite();
-
-        if ($this->ParentID) {
-            $this->MenuSetID = $this->Parent()->MenuSetID;
-        }
-    }
-
     public function getSortableScope()
     {
         return self::get()
