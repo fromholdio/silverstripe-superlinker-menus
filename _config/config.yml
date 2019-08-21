@@ -3,15 +3,21 @@ Name: fromholdio-superlinker-menus-multisites
 Only:
   moduleexists: 'symbiote/silverstripe-multisites'
 ---
+
 Symbiote\Multisites\Model\Site:
   extensions:
     - Fromholdio\SuperLinkerMenus\Extensions\MenusSiteExtension
+
+Fromholdio\SuperLinkerMenus\Model\MenuSet:
+  extensions:
+    - Fromholdio\SuperLinkerMenus\Extensions\MultisitesMenuSetExtension
 
 ---
 Name: fromholdio-superlinker-menus-nomultisites
 Except:
   moduleexists: 'symbiote/silverstripe-multisites'
 ---
+
 SilverStripe\SiteConfig\SiteConfig:
   extensions:
     - Fromholdio\SuperLinkerMenus\Extensions\MenusSiteConfigExtension

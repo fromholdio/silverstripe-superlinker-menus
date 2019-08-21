@@ -17,12 +17,7 @@ class MenuItemSiteTree extends MenuItem
         GlobalAnchors::class
     ];
 
-    private static $db = [
-        'DoUseSiteTreeChildren' => 'Boolean'
-    ];
-
     private static $field_labels = [
-        'DoUseSiteTreeChildren' => 'Build submenu from children of selected target page',
         'SiteTree' => 'Target Page'
     ];
 
@@ -34,28 +29,13 @@ class MenuItemSiteTree extends MenuItem
     public function getCMSFields()
     {
         $fields = parent::getCMSFields();
-
-        if ($this->isAllowedChildren()) {
-
-            $useTreeChildren = FieldGroup::create(
-                'Submenu Items',
-                CheckboxField::create(
-                    'DoUseSiteTreeChildren',
-                    $this->fieldLabel('DoUseSiteTreeChildren')
-                )
-            );
-            $fields->replaceField('DoUseSiteTreeChildren', $useTreeChildren);
-
-            $childrenField = $fields->dataFieldByName('Children');
-            $childrenWrapper = Wrapper::create($childrenField);
-            $fields->replaceField('Children', $childrenWrapper);
-
-            $childrenWrapper->displayIf('DoUseSiteTreeChildren')->isNotChecked();
+        if ($this->getCanHaveChildren()) {
+            if ($this->SiteTreeID) {
+                if (!$this->SubmenuSiteTreeID) {
+                    $this->SubmenuSiteTreeID = $this->SiteTreeID;
+                }
+            }
         }
-        else {
-            $fields->removeByName('DoUseSiteTreeChildren');
-        }
-
         return $fields;
     }
 }

@@ -4,6 +4,8 @@ namespace Fromholdio\SuperLinkerMenus\Model;
 
 use Fromholdio\Sortable\Extensions\Sortable;
 use Fromholdio\SuperLinker\Model\SuperLink;
+use SilverStripe\CMS\Model\SiteTree;
+use SilverStripe\Control\Controller;
 use SilverStripe\Forms\GridField\GridField;
 use SilverStripe\Forms\GridField\GridFieldAddExistingAutocompleter;
 use SilverStripe\Forms\GridField\GridFieldAddNewButton;
@@ -11,32 +13,50 @@ use SilverStripe\Forms\GridField\GridFieldConfig_RecordEditor;
 use SilverStripe\Forms\GridField\GridFieldPageCount;
 use SilverStripe\Forms\GridField\GridFieldPaginator;
 use SilverStripe\Forms\GridField\GridFieldToolbarHeader;
-use SilverStripe\Forms\LiteralField;
+use SilverStripe\Forms\HeaderField;
+use SilverStripe\Forms\OptionsetField;
+use SilverStripe\Forms\Tab;
+use SilverStripe\Forms\TreeDropdownField;
 use SilverStripe\Versioned\Versioned;
 use Symbiote\GridFieldExtensions\GridFieldAddNewMultiClass;
 use Symbiote\GridFieldExtensions\GridFieldOrderableRows;
+use UncleCheese\DisplayLogic\Forms\Wrapper;
 
 class MenuItem extends SuperLink
 {
+    const SUBMENU_SITETREE = 'sitetree';
+    const SUBMENU_MANUAL = 'manual';
+    const SUBMENU_NONE = 'none';
+
     private static $table_name = 'MenuItem';
     private static $singular_name = 'Menu Item';
     private static $plural_name = 'Menu Items';
 
-    private static $allow_anchor = true;
-    private static $allow_query_string = true;
+    private static $enable_tabs = true;
+
+    private static $submenu_mode_options = [
+        self::SUBMENU_NONE => 'No submenu',
+        self::SUBMENU_SITETREE => 'Build submenu from links to children of a page on this site',
+        self::SUBMENU_MANUAL => 'Manually build a submenu of links'
+    ];
 
     private static $extensions = [
         Sortable::class,
         Versioned::class
     ];
 
+    private static $db = [
+        'SubmenuMode' => 'Varchar(20)'
+    ];
+
     private static $has_one = [
         'MenuSet' => MenuSet::class,
-        'Parent' => MenuItem::class
+        'Parent' => MenuItem::class,
+        'SubmenuSiteTree' => SiteTree::class
     ];
 
     private static $has_many = [
-        'Children' => MenuItem::class
+        'Children' => MenuItem::class . '.Parent'
     ];
 
     private static $owns = [
@@ -45,6 +65,11 @@ class MenuItem extends SuperLink
 
     private static $cascade_deletes = [
         'Children'
+    ];
+
+    private static $field_labels = [
+        'SubmenuMode' => 'Submenu',
+        'SubmenuSiteTree' => 'Select Page'
     ];
 
     private static $summary_fields = [
@@ -59,28 +84,69 @@ class MenuItem extends SuperLink
         $fields->removeByName([
             'Children',
             'MenuSetID',
-            'ParentID'
+            'ParentID',
+            'SubmenuMode',
+            'SubmenuSiteTreeID'
         ]);
 
-        if (!$this->isAllowedChildren()) {
+        if (!$this->getCanHaveChildren()) {
             return $fields;
         }
 
-        if ($this->isInDB()) {
-            $fields->addFieldsToTab(
-                'Root.Main',
-                [
-                    LiteralField::create('GridFieldPadding', '<br>'),
-                    GridField::create(
-                        'Children',
-                        'Child Menu Items',
-                        $this->Children(),
-                        $config = GridFieldConfig_RecordEditor::create()
-                    )
-                ]
+        $modeOptions = $this->getSubmenuModeOptions();
+        if (!$modeOptions) {
+            return $fields;
+        }
+
+        $submenuTab = Tab::create('SubmenuTab', 'Submenu');
+        $menuTabSet = $fields->fieldByName('Root.Main');
+
+        if (!$this->isInDB()) {
+            $submenuTab->push(
+                HeaderField::create(
+                    'SubmenuHeader',
+                    'You can construct a submenu after saving this menu item for the first time.',
+                    3
+                )
+            );
+            $menuTabSet->push($submenuTab);
+            return $fields;
+        }
+
+        if (!$this->SubmenuMode) {
+            $this->SubmenuMode = $this->getDefaultSubmenuMode();
+        }
+
+        $modeField = OptionsetField::create(
+            'SubmenuMode',
+            $this->fieldLabel('SubmenuMode'),
+            $modeOptions
+        );
+        $submenuTab->push($modeField);
+        $menuTabSet->push($submenuTab);
+
+        if (isset($modeOptions[self::SUBMENU_SITETREE])) {
+
+            $submenuSiteTreeField = TreeDropdownField::create(
+                'SubmenuSiteTreeID',
+                $this->fieldLabel('SubmenuSiteTree'),
+                SiteTree::class
+            );
+            $submenuSiteTreeWrapper = Wrapper::create($submenuSiteTreeField);
+            $submenuSiteTreeWrapper->displayIf('SubmenuMode')->isEqualTo(self::SUBMENU_SITETREE);
+            $submenuTab->push($submenuSiteTreeWrapper);
+        }
+
+        if (isset($modeOptions[self::SUBMENU_MANUAL])) {
+
+            $childrenField = GridField::create(
+                'Children',
+                $this->fieldLabel('Children'),
+                $this->Children(),
+                $childrenConfig = GridFieldConfig_RecordEditor::create()
             );
 
-            $config
+            $childrenConfig
                 ->removeComponentsByType([
                     GridFieldAddNewButton::class,
                     GridFieldAddExistingAutocompleter::class,
@@ -90,38 +156,95 @@ class MenuItem extends SuperLink
                 ])
                 ->addComponents([
                     new GridFieldOrderableRows(),
-                    $adder = new GridFieldAddNewMultiClass()
+                    $childrenAdder = new GridFieldAddNewMultiClass()
                 ]);
 
-            $adder->setClasses($this->MenuSet()->getMenuItemClasses());
+            $childrenAdder->setClasses(
+                $this->getRootMenuSet()->getMenuItemClasses()
+            );
+
+            $childrenWrapper = Wrapper::create($childrenField);
+            $childrenWrapper->displayIf('SubmenuMode')->isEqualTo(self::SUBMENU_MANUAL);
+            $submenuTab->push($childrenWrapper);
         }
 
+        $this->extend('updateMenuItemCMSFields', $fields);
         return $fields;
     }
 
-    public function isAllowedChildren()
+    public function getCanHaveChildren()
     {
-        $maxSubmenus = $this->MenuSet()->AllowedSubmenuCount;
-        if ($maxSubmenus < 1) {
+        $menuSet = $this->getRootMenuSet();
+        if (!$menuSet) {
+            return false;
+        }
+        $maxDepth = (int) $menuSet->MaxDepth;
+        if ($maxDepth < 1) {
             return false;
         }
 
-        if ($this->ParentID < 1) {
+        $depth = $this->getDepth();
+        if ($depth < 1) {
             return true;
         }
 
-        $parent = $this->Parent();
+        return ($maxDepth > $depth);
+    }
 
-        $i = 1;
-        while ($i <= $maxSubmenus) {
-            if ($parent->ParentID < 1) {
-                return true;
-            }
-            $parent = $parent->Parent();
-            $i++;
+    public function getDepth()
+    {
+        $parentID = (int) $this->ParentID;
+        if (!$parentID) {
+            return 0;
         }
 
-        return false;
+        $i = 1;
+        $parent = $this;
+        while($parentID > 0) {
+            $parent = $parent->Parent();
+            $parentID = (int) $parent->ParentID;
+            $i++;
+        }
+        return $i;
+    }
+
+    public function getDefaultSubmenuMode()
+    {
+        $mode = self::SUBMENU_NONE;
+        $this->extend('updateDefaultSubmenuMode', $mode);
+        return $mode;
+    }
+
+    public function getSubmenuModeOptions()
+    {
+        $options = $this->config()->get('submenu_mode_options');
+        if (!$this->getCanHaveChildren()) {
+            $options = null;
+        }
+        foreach ($options as $key => $label) {
+            if (!$label) {
+                unset($options[$key]);
+            }
+        }
+        $this->extend('updateSubmenuModeOptions', $options);
+        if (!$options || !is_array($options)) {
+            $options = null;
+        }
+        else if (count($options) === 1 && isset($options[self::SUBMENU_NONE])) {
+            $options = null;
+        }
+        return $options;
+    }
+
+    public function getRootMenuSet()
+    {
+        if ($this->MenuSetID) {
+            return $this->MenuSet();
+        }
+        if ($this->ParentID) {
+            return $this->Parent()->getRootMenuSet();
+        }
+        return null;
     }
 
     public function getSortableScope()
@@ -134,27 +257,56 @@ class MenuItem extends SuperLink
             ->exclude('ID', $this->ID);
     }
 
+    public function CMSEditLink()
+    {
+        $link = null;
+        if ($this->ParentID) {
+            $link = Controller::join_links(
+                $this->Parent()->CMSEditLink(),
+                'ItemEditForm/field/Children/item',
+                $this->ID
+            );
+        }
+        else if ($this->MenuSetID) {
+            $link = Controller::join_links(
+                $this->MenuSet()->CMSEditLink(),
+                'ItemEditForm/field/Items/item',
+                $this->ID
+            );
+        }
+        $this->extend('updateCMSEditLink', $link);
+        return $link;
+    }
+
     public function canView($member = null)
     {
+        if ($this->ParentID) {
+            return $this->Parent()->canView($member);
+        }
         return $this->MenuSet()->canView($member);
     }
 
     public function canEdit($member = null)
     {
+        if ($this->ParentID) {
+            return $this->Parent()->canEdit($member);
+        }
         return $this->MenuSet()->canEdit($member);
     }
 
     public function canDelete($member = null)
     {
+        if ($this->ParentID) {
+            return $this->Parent()->canDelete($member);
+        }
         return $this->MenuSet()->canDelete($member);
     }
 
     public function canCreate($member = null, $context = [])
     {
-        if (isset($context['Parent'])) {
-            return $context['Parent']->canEdit($member);
+        if ($this->ParentID) {
+            return $this->Parent()->canCreate($member, $context);
         }
-
         return $this->MenuSet()->canEdit($member);
     }
 }

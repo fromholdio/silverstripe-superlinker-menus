@@ -3,6 +3,7 @@
 namespace Fromholdio\SuperLinkerMenus\Extensions;
 
 use Fromholdio\SuperLinkerMenus\Model\MenuSet;
+use SilverStripe\CMS\Model\SiteTreeExtension;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\GridField\GridField;
 use SilverStripe\Forms\GridField\GridFieldAddExistingAutocompleter;
@@ -11,12 +12,13 @@ use SilverStripe\Forms\GridField\GridFieldConfig_RecordEditor;
 use SilverStripe\Forms\GridField\GridFieldPageCount;
 use SilverStripe\Forms\GridField\GridFieldPaginator;
 use SilverStripe\Forms\GridField\GridFieldToolbarHeader;
-use SilverStripe\ORM\DataExtension;
 
-class MenusSiteExtension extends DataExtension
+class MenusSiteExtension extends SiteTreeExtension
 {
+    private static $menus_tab_path = 'Root.Menus';
+
     private static $has_many = [
-        'MenuSets' => MenuSet::class . '.Parent'
+        'MenuSets' => MenuSet::class
     ];
 
     private static $owns = [
@@ -27,37 +29,17 @@ class MenusSiteExtension extends DataExtension
         'MenuSets'
     ];
 
-    public function updateCMSFields(FieldList $fields)
-    {
-        $fields->removeByName('MenuSets');
-
-        $fields->addFieldsToTab(
-            'Root.Menus',
-            [
-                GridField::create(
-                    'MenuSets',
-                    'Menus',
-                    $this->getOwner()->MenuSets(),
-                    $config = GridFieldConfig_RecordEditor::create()
-                )
-            ]
-        );
-
-        $config->removeComponentsByType([
-            GridFieldAddNewButton::class,
-            GridFieldAddExistingAutocompleter::class,
-            GridFieldPageCount::class,
-            GridFieldPaginator::class,
-            GridFieldToolbarHeader::class
-        ]);
-    }
-
     public function updateSiteCMSFields(FieldList $fields)
     {
         $fields->removeByName('MenuSets');
 
+        $tabPath = $this->getMenuSetsTabPath();
+        if (!$tabPath) {
+            return;
+        }
+
         $fields->addFieldsToTab(
-            'Root.Menus',
+            $tabPath,
             [
                 GridField::create(
                     'MenuSets',
@@ -77,9 +59,10 @@ class MenusSiteExtension extends DataExtension
         ]);
     }
 
-    public function onAfterWrite()
+    public function getMenusTabPath()
     {
-        parent::onAfterWrite();
-        MenuSet::update_menusets($this->getOwner());
+        $path = $this->getOwner()->config()->get('menus_tab_path');
+        $this->getOwner()->invokeWithExtensions('updateMenusTabPath');
+        return $path;
     }
 }

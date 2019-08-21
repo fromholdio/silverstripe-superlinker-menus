@@ -3,8 +3,10 @@
 namespace Fromholdio\SuperLinkerMenus\Model;
 
 use Fromholdio\GridFieldLimiter\Forms\GridFieldLimiter;
+use SilverStripe\Admin\LeftAndMain;
+use SilverStripe\Control\Controller;
 use SilverStripe\Core\ClassInfo;
-use SilverStripe\Core\Convert;
+use SilverStripe\Core\Config\Config;
 use SilverStripe\Core\Manifest\ModuleLoader;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\GridField\GridField;
@@ -14,10 +16,12 @@ use SilverStripe\Forms\GridField\GridFieldConfig_RecordEditor;
 use SilverStripe\Forms\GridField\GridFieldPageCount;
 use SilverStripe\Forms\GridField\GridFieldPaginator;
 use SilverStripe\Forms\GridField\GridFieldToolbarHeader;
-use SilverStripe\Forms\ReadonlyField;
+use SilverStripe\Forms\HeaderField;
+use SilverStripe\Forms\HiddenField;
 use SilverStripe\Forms\Tab;
 use SilverStripe\Forms\TabSet;
 use SilverStripe\Forms\TextField;
+use SilverStripe\ORM\DataList;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\Security\Permission;
 use SilverStripe\Security\PermissionProvider;
@@ -40,17 +44,13 @@ class MenuSet extends DataObject implements PermissionProvider
     ];
 
     private static $db = [
-        'Name' => 'Varchar',
-        'Title' => 'Varchar',
-        'IsTitleEnabled' => 'Boolean',
         'Key' => 'Varchar(50)',
-        'AllowedSubmenuCount' => 'Int',
-        'Limit' => 'Int',
+        'Name' => 'Varchar',
+        'CustomTitle' => 'Varchar',
+        'IsTitleEnabled' => 'Boolean',
+        'ItemsLimit' => 'Int',
+        'MaxDepth' => 'Int',
         'Sort' => 'Int'
-    ];
-
-    private static $has_one = [
-        'Parent' => DataObject::class
     ];
 
     private static $has_many = [
@@ -65,191 +65,204 @@ class MenuSet extends DataObject implements PermissionProvider
         'Items'
     ];
 
+    private static $defaults = [
+        'IsTitleEnabled' => false,
+        'ItemsLimit' => 0,
+        'MaxDepth' => 0,
+        'Sort' => 1
+    ];
+
     private static $summary_fields = [
-        'Name',
+        'Title',
         'Items.Count' => 'Items'
     ];
 
     private static $default_sort = 'Sort';
 
-    public static function get_by_key($key, $siteID = null)
+    public function MenuItems()
     {
-        $config = null;
-
-        $isMultisites = ModuleLoader::inst()
-            ->getManifest()
-            ->moduleExists('symbiote/silverstripe-multisites');
-
-        if ($isMultisites) {
-
-            $siteID = (int) $siteID;
-            if ($siteID > 0) {
-                $config = Site::get()->byID($siteID);
-            }
-
-            if (!$config || !$config->exists()) {
-                $config = Multisites::inst()->getCurrentSite();
-            }
-        }
-
-        if (!$config || !$config->exists()) {
-            $config = SiteConfig::current_site_config();
-        }
-
-        return $config->MenuSets()->find('Key', $key);
+        return $this->Items();
     }
 
-    public static function update_menusets($parent = null)
+    public static function get_by_key($key)
     {
-        $isMultisites = ModuleLoader::inst()
-            ->getManifest()
-            ->moduleExists('symbiote/silverstripe-multisites');
+        return MenuSet::get()->find('Key', $key);
+    }
 
-        if (!$parent) {
-            if ($isMultisites) {
-                $sites = \Symbiote\Multisites\Model\Site::get();
-                foreach ($sites as $site) {
-                    self::update_menusets($site);
+    public static function update_menusets(DataList $menuSets = null, $themes = null)
+    {
+        if (is_null($menuSets)) {
+            $menuSets = self::get();
+        }
+        if (!$themes) {
+            $themes = SSViewer::get_themes();
+        }
+
+        $updatedMenuSetIDs = [];
+
+        $configMenuSets = self::get_config_menusets($themes);
+        if ($configMenuSets) {
+            foreach ($menuSets as $menuSet) {
+                if (isset($configMenuSets[$menuSet->Key])) {
+                    $data = $configMenuSets[$menuSet->Key];
+                    $menuSet = $menuSet->updateFromConfig($data);
+                    $updatedMenuSetIDs[] = $menuSet->ID;
+                    unset($configMenuSets[$menuSet->Key]);
                 }
-                return null;
+                else {
+                    $menuSet->doArchive();
+                }
             }
-            else {
-                $siteConfig = SiteConfig::current_site_config();
-                return self::update_menusets($siteConfig);
-            }
-        }
 
-        if (is_a($parent, SiteConfig::class)) {
-            $activeThemes = SSViewer::get_themes();
-        }
-        else if ($isMultisites && is_a($parent, 'Symbiote\Multisites\Model\Site')) {
-            $activeThemes = $parent->getSiteTheme();
-            if (!$activeThemes) {
-                $activeThemes = SSViewer::get_themes();
+            foreach ($configMenuSets as $key => $data) {
+                $menuSet = self::create();
+                $menuSet->Key = $key;
+                $menuSet = $menuSet->updateFromConfig($data);
+                $updatedMenuSetIDs[] = $menuSet->ID;
             }
         }
         else {
-            $activeThemes = [];
-        }
-
-        $menuConfigs = MenuSet::get_menu_configs($activeThemes);
-        $menuSets = $parent->MenuSets();
-
-        $existingMenuSetIDs = $menuSets->columnUnique('ID');
-        $existingMenuSetIDs = array_combine($existingMenuSetIDs, $existingMenuSetIDs);
-
-        foreach ($menuConfigs as $key => $options) {
-            $menuSet = $parent->MenuSets()->filter('Key', $key)->first();
-            if (!$menuSet || !$menuSet->exists()) {
-                $menuSet = MenuSet::create();
-                $menuSet->Key = $key;
-            }
-            $menuSet->Name = $options['name'];
-            $menuSet->IsTitleEnabled = $options['title'];
-            $menuSet->AllowedSubmenuCount = $options['allowedSubmenus'];
-            $menuSet->Limit = $options['limit'];
-            $menuSet->Sort = $options['sort'];
-            $menuSet->ParentClass = $parent->ClassName;
-            $menuSet->ParentID = $parent->ID;
-            $menuSet->write();
-            $menuSet->publishSingle();
-            if (isset($existingMenuSetIDs[$menuSet->ID])) {
-                unset($existingMenuSetIDs[$menuSet->ID]);
+            if ($menuSets->count() > 0) {
+                foreach ($menuSets as $menuSet) {
+                    $menuSet->doArchive();
+                }
             }
         }
 
-        foreach ($existingMenuSetIDs as $menuID) {
-            $menuSet = $parent->MenuSets()->filter('ID', $menuID)->first();
-            $menuSet->doUnpublish();
-            $menuSet->doArchive();
-        }
-    }
-
-    public static function get_menu_configs($themes = null)
-    {
-        $config = [];
-        $menus = MenuSet::config()->get('menus');
-        if (!$menus || !is_array($menus)) {
+        if (count($updatedMenuSetIDs) < 1) {
             return null;
         }
 
-        if (isset($menus['themes'])) {
-            $menuThemes = $menus['themes'];
+        return self::get()->filter('ID', $updatedMenuSetIDs);
+    }
+
+    public static function get_config_menusets($themes = null)
+    {
+        $menuSets = [];
+
+        $config = Config::inst()->get(self::class, 'theme_menus');
+        if (is_array($config)) {
             if ($themes) {
                 if (!is_array($themes)) {
                     $themes = [$themes];
                 }
                 foreach ($themes as $theme) {
-                    if (isset($menuThemes[$theme])) {
-                        $themeMenus = $menuThemes[$theme];
-                        foreach ($themeMenus as $key => $options) {
-                            $key = Convert::raw2htmlid($key);
-                            $config[$key] = self::parse_menu_config($options);
+                    if (isset($config[$theme])) {
+                        foreach ($config[$theme] as $key => $data) {
+                            $menuSets[$key] = $data;
                         }
                     }
                 }
             }
-            unset($menus['themes']);
-        }
-
-        foreach ($menus as $key => $options) {
-            $key = Convert::raw2htmlid($key);
-            $config[$key] = self::parse_menu_config($options);
-        }
-
-        return $config;
-    }
-
-    public static function parse_menu_config($config)
-    {
-        if (is_array($config)) {
-            $name = $config['name'];
-            if (isset($config['allowed_submenus'])) {
-                $allowedSubmenus = (int) $config['allowed_submenus'];
-            }
-            else {
-                $allowedSubmenus = 0;
-            }
-            if (isset($config['limit'])) {
-                $limit = (int) $config['limit'];
-            }
-            else {
-                $limit = 0;
-            }
-            if (isset($config['sort'])) {
-                $sort = (int) $config['sort'];
-            }
-            else {
-                $sort = 0;
-            }
-            if (isset($config['title'])) {
-                $title = (bool) $config['title'];
-            }
-            else {
-                $title = false;
-            }
         }
         else {
-            $name = $config;
-            $title = false;
-            $allowedSubmenus = 0;
-            $limit = 0;
-            $sort = 0;
+            $config = Config::inst()->get(self::class, 'menus');
+            if (is_array($config)) {
+                foreach ($config as $key => $data) {
+                    $menuSets[$key] = $data;
+                }
+            }
         }
 
-        return [
-            'name' => $name,
-            'title' => $title,
-            'allowedSubmenus' => $allowedSubmenus,
-            'limit' => $limit,
-            'sort' => $sort
-        ];
+        if (count($menuSets) < 1) {
+            return null;
+        }
+        return $menuSets;
+    }
+
+    public function getTitle()
+    {
+        $title = null;
+        if ($this->IsTitleEnabled && $this->CustomTitle) {
+            $title = $this->CustomTitle;
+        }
+        $curr = Controller::curr();
+        if (is_a($curr, LeftAndMain::class)) {
+            if ($title) {
+                $title .= ' (' . $this->Name . ')';
+            }
+            else {
+                $title = $this->Name;
+            }
+        }
+        $this->extend('updateTitle', $title);
+        return $title;
+    }
+
+    public function updateFromConfig($data)
+    {
+        if (is_string($data)) {
+            if ($data !== $this->Name) {
+                $this->Name = $data;
+                $this->write();
+                $this->publishSingle();
+            }
+            return $this;
+        }
+
+        $doWrite = false;
+
+        if ($data['name'] !== $this->Name) {
+            $this->Name = $data['name'];
+            $doWrite = true;
+        }
+
+        if (isset($data['enable_title'])) {
+            $isTitleEnabled = (bool) $data['enable_title'];
+            if ($isTitleEnabled && !$this->IsTitleEnabled) {
+                $this->IsTitleEnabled = true;
+                $doWrite = true;
+            }
+            else if (!$isTitleEnabled && $this->IsTitleEnabled) {
+                $this->IsTitleEnabled = false;
+                $doWrite = true;
+            }
+        }
+
+        if (isset($data['limit'])) {
+            $limit = (int) $data['limit'];
+            if ($limit !== (int) $this->Limit) {
+                $this->Limit = $limit;
+                $doWrite = true;
+            }
+        }
+
+        if (isset($data['max_depth'])) {
+            $maxDepth = (int) $data['max_depth'];
+            if ($maxDepth !== (int) $this->MaxDepth) {
+                $this->MaxDepth = $maxDepth;
+                $doWrite = true;
+            }
+        }
+
+        if (isset($data['sort'])) {
+            $sort = (int) $data['sort'];
+            if ($sort !== (int) $this->Sort) {
+                $this->Sort = $sort;
+                $doWrite = true;
+            }
+        }
+
+        if ($doWrite) {
+            $this->write();
+            $this->publishSingle();
+        }
+
+        return $this;
     }
 
     public function requireDefaultRecords()
     {
-        parent::requireDefaultRecords();
-        self::update_menusets();
+        $isMultisites = ModuleLoader::inst()
+            ->getManifest()
+            ->moduleExists('symbiote/silverstripe-multisites');
+
+        if ($isMultisites) {
+            self::update_menusets_multisites();
+        }
+        else {
+            self::update_menusets();
+        }
     }
 
     public function getCMSFields()
@@ -257,24 +270,27 @@ class MenuSet extends DataObject implements PermissionProvider
         $fields = FieldList::create(
             TabSet::create(
                 'Root',
-                Tab::create('Main')
+                $mainTab = Tab::create(
+                    'Main',
+                    HeaderField::create('NameHeader', $this->Name, 2)
+                )
             )
         );
 
-        $fields->addFieldsToTab(
-            'Root.Main',
-            [
-                ReadonlyField::create('Name'),
-                GridField::create(
-                    'Items',
-                    'Menu Items',
-                    $this->Items(),
-                    $config = GridFieldConfig_RecordEditor::create()
-                )
-            ]
+        if ($this->IsTitleEnabled) {
+            $mainTab->push(
+                TextField::create('Title', $this->fieldLabel('Title'))
+            );
+        }
+
+        $itemsField = GridField::create(
+            'Items',
+            $this->fieldLabel('Items'),
+            $this->Items(),
+            $itemsConfig = GridFieldConfig_RecordEditor::create()
         );
 
-        $config
+        $itemsConfig
             ->removeComponentsByType([
                 GridFieldAddNewButton::class,
                 GridFieldAddExistingAutocompleter::class,
@@ -284,54 +300,46 @@ class MenuSet extends DataObject implements PermissionProvider
             ])
             ->addComponent(new GridFieldOrderableRows());
 
-        if ($this->AllowedSubmenuCount > 0) {
-            $fields->insertAfter(
-                'Name',
-                ReadonlyField::create('AllowedSubmenuCount')
-            );
-        }
-
-        $adder = new GridFieldAddNewMultiClass();
-        $adder->setClasses($this->getMenuItemClasses());
-
-        if ($this->IsTitleEnabled) {
-            $titleField = TextField::create(
-                'Title',
-                $this->fieldLabel('Title')
-            );
-            $fields->insertAfter('Name', $titleField);
-        }
+        $itemsAdder = new GridFieldAddNewMultiClass();
+        $itemsAdder->setClasses($this->getMenuItemClasses());
 
         if ($this->Limit > 0) {
-            $config->addComponent(
-                new GridFieldLimiter($this->Limit, 'before', true)
-            );
-            $adder->setFragment('limiter-before-left');
-            $fields->insertAfter(
-                'Name',
-                ReadonlyField::create('Limit')
-            );
+            $itemsLimiter = new GridFieldLimiter($this->Limit, 'before', true);
+            $itemsConfig->addComponent($itemsLimiter);
+            $itemsAdder->setFragment('limiter-before-left');
         }
-        $config->addComponent($adder);
+
+        $itemsConfig->addComponent($itemsAdder);
+
+        $mainTab->push($itemsField);
+        $mainTab->push(HiddenField::create('ID', false));
 
         $this->extend('updateCMSFields', $fields);
         return $fields;
     }
 
-    public function MenuItems($includeChildren = false)
+    public function validate()
     {
-        return $this->getMenuItems($includeChildren);
-    }
+        $result = parent::validate();
 
-    public function getMenuItems($includeChildren = false)
-    {
-        $items = $this->Items();
-        if ($includeChildren) {
-            return $items;
+        if ($this->Key) {
+            $sameKeyMenuSets = self::get()
+                ->filter('Key', $this->Key)
+                ->exclude('ID', $this->ID);
+            if ($sameKeyMenuSets->count() > 0) {
+                $result->addFieldError('Key', 'You must use a unique key');
+            }
         }
-        return $items->filter('ParentID', 0);
-    }
+        else {
+            $result->addFieldError('Key', 'You must provide a key');
+        }
 
+        if (!$this->Name) {
+            $result->addFieldError('Name', 'You must provide a name');
+        }
+
+        return $result;
+    }
 
     public function getMenuItemClasses()
     {
@@ -344,10 +352,23 @@ class MenuSet extends DataObject implements PermissionProvider
         if (array_key_exists(MenuItem::class, $list)) {
             unset($list[MenuItem::class]);
         }
+        $this->extend('updateMenuItemClasses', $list);
         return $list;
     }
 
-    public function PermissionKey()
+    public function CMSEditLink()
+    {
+        $siteConfig = SiteConfig::current_site_config();
+        $link = Controller::join_links(
+            $siteConfig->CMSEditLink(),
+            'EditForm/field/MenuSets/item',
+            $this->ID
+        );
+        $this->extend('updateCMSEditLink', $link);
+        return $link;
+    }
+
+    public function getPermissionKey()
     {
         return 'MENUS_EDIT_' . $this->obj('Key')->Uppercase();
     }
@@ -355,8 +376,8 @@ class MenuSet extends DataObject implements PermissionProvider
     public function providePermissions()
     {
         $permissions = [];
-        foreach (MenuSet::get() as $menuSet) {
-            $key = $menuSet->PermissionKey();
+        foreach (self::get() as $menuSet) {
+            $key = $menuSet->getPermissionKey();
             $permissions[$key] = [
                 'name' => 'Manage ' . $menuSet->obj('Name'),
                 'category' => 'Menus'
@@ -377,11 +398,11 @@ class MenuSet extends DataObject implements PermissionProvider
 
     public function canEdit($member = null)
     {
-        return Permission::check($this->PermissionKey(), 'any', $member);
+        return Permission::check($this->getPermissionKey(), 'any', $member);
     }
 
     public function canView($member = null)
     {
-        return Permission::check($this->PermissionKey(), 'any', $member);
+        return Permission::check($this->getPermissionKey(), 'any', $member);
     }
 }

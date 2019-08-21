@@ -15,29 +15,22 @@ use SilverStripe\ORM\DataExtension;
 
 class MenusSiteConfigExtension extends DataExtension
 {
-    private static $has_many = [
-        'MenuSets' => MenuSet::class . '.Parent'
-    ];
-
-    private static $owns = [
-        'MenuSets'
-    ];
-
-    private static $cascade_deletes = [
-        'MenuSets'
-    ];
+    private static $menus_tab_path = 'Root.Menus';
 
     public function updateCMSFields(FieldList $fields)
     {
-        $fields->removeByName('MenuSets');
+        $tabPath = $this->getMenusTabPath();
+        if (!$tabPath) {
+            return;
+        }
 
         $fields->addFieldsToTab(
-            'Root.Menus',
+            $tabPath,
             [
                 GridField::create(
                     'MenuSets',
                     'Menus',
-                    $this->getOwner()->MenuSets(),
+                    MenuSet::get(),
                     $config = GridFieldConfig_RecordEditor::create()
                 )
             ]
@@ -52,9 +45,10 @@ class MenusSiteConfigExtension extends DataExtension
         ]);
     }
 
-    public function onAfterWrite()
+    public function getMenusTabPath()
     {
-        parent::onAfterWrite();
-        MenuSet::update_menusets($this->getOwner());
+        $path = $this->getOwner()->config()->get('menus_tab_path');
+        $this->getOwner()->invokeWithExtensions('updateMenusTabPath');
+        return $path;
     }
 }
