@@ -3,6 +3,8 @@
 namespace Fromholdio\SuperLinkerMenus\Extensions;
 
 use Fromholdio\SuperLinkerMenus\Model\MenuSet;
+use SilverStripe\CMS\Controllers\CMSPageEditController;
+use SilverStripe\Control\Controller;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\ORM\DataExtension;
 use Symbiote\Multisites\Model\Site;
@@ -13,6 +15,11 @@ class MultisitesMenuSetExtension extends DataExtension
     private static $has_one = [
         'Site' => Site::class
     ];
+
+    public function updateCMSFields(FieldList $fields)
+    {
+        $fields->removeByName('SiteID');
+    }
 
     public static function get_by_key_multisites($key, $siteID = null)
     {
@@ -43,18 +50,24 @@ class MultisitesMenuSetExtension extends DataExtension
         else {
             $sites = Site::get();
             foreach ($sites as $site) {
-                MenuSet::update_menusets_multisites($site);
+                self::update_menusets_multisites($site);
             }
         }
     }
 
-    public function updateCMSFields(FieldList $fields)
-    {
-        $fields->removeByName('SiteID');
-    }
-
     public function updateCMSEditLink(&$link)
     {
-        // TODO
+        $site = $this->getOwner()->Site();
+        if ($site) {
+            $link = Controller::join_links(
+                singleton(CMSPageEditController::class)->Link('EditForm'),
+                $site->ID,
+                'field/MenuSets/item',
+                $this->getOwner()->ID
+            );
+        }
+        else {
+            $link = null;
+        }
     }
 }

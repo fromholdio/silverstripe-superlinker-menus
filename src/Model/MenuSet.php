@@ -3,6 +3,7 @@
 namespace Fromholdio\SuperLinkerMenus\Model;
 
 use Fromholdio\GridFieldLimiter\Forms\GridFieldLimiter;
+use Fromholdio\SuperLinkerMenus\Extensions\MultisitesMenuSetExtension;
 use SilverStripe\Admin\LeftAndMain;
 use SilverStripe\Control\Controller;
 use SilverStripe\Core\ClassInfo;
@@ -258,7 +259,7 @@ class MenuSet extends DataObject implements PermissionProvider
             ->moduleExists('symbiote/silverstripe-multisites');
 
         if ($isMultisites) {
-            self::update_menusets_multisites();
+            MultisitesMenuSetExtension::update_menusets_multisites();
         }
         else {
             self::update_menusets();

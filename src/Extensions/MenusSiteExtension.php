@@ -33,7 +33,7 @@ class MenusSiteExtension extends SiteTreeExtension
     {
         $fields->removeByName('MenuSets');
 
-        $tabPath = $this->getMenuSetsTabPath();
+        $tabPath = $this->getOwner()->getMenusTabPath();
         if (!$tabPath) {
             return;
         }

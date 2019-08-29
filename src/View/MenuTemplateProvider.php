@@ -2,6 +2,7 @@
 
 namespace Fromholdio\SuperLinkerMenus\View;
 
+use Fromholdio\SuperLinkerMenus\Extensions\MultisitesMenuSetExtension;
 use Fromholdio\SuperLinkerMenus\Model\MenuSet;
 use SilverStripe\Core\Manifest\ModuleLoader;
 use SilverStripe\View\TemplateGlobalProvider;
@@ -21,7 +22,7 @@ class MenuTemplateProvider implements TemplateGlobalProvider
             ->moduleExists('symbiote/silverstripe-multisites');
 
         if ($isMultisites) {
-            return MenuSet::get_by_key_multisites($key, $siteID);
+            return MultisitesMenuSetExtension::get_by_key_multisites($key, $siteID);
         }
         return MenuSet::get_by_key($key);
     }
