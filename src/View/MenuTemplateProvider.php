@@ -2,9 +2,8 @@
 
 namespace Fromholdio\SuperLinkerMenus\View;
 
-use Fromholdio\SuperLinkerMenus\Extensions\MultisitesMenuSetExtension;
 use Fromholdio\SuperLinkerMenus\Model\MenuSet;
-use SilverStripe\Core\Manifest\ModuleLoader;
+use SilverStripe\Control\Controller;
 use SilverStripe\View\TemplateGlobalProvider;
 
 class MenuTemplateProvider implements TemplateGlobalProvider
@@ -16,14 +15,17 @@ class MenuTemplateProvider implements TemplateGlobalProvider
         ];
     }
 
-    public static function MenuSet($key, $siteID = null)
+    public static function MenuSet($key, $parentID = null)
     {
-        $isMultisites = ModuleLoader::inst()->getManifest()
-            ->moduleExists('symbiote/silverstripe-multisites');
-
-        if ($isMultisites) {
-            return MultisitesMenuSetExtension::get_by_key_multisites($key, $siteID);
+        if (!$parentID) {
+            $curr = Controller::curr();
+            if ($curr->hasMethod('getCurrentMenuSetParent')) {
+                $parent = $curr->getCurrentMenuSetParent();
+                if ($parent && $parent->exists()) {
+                    return MenuSet::get_by_key($key, $parentID);
+                }
+            }
         }
-        return MenuSet::get_by_key($key);
+        return MenuSet::get_by_key($key, $parentID);
     }
 }

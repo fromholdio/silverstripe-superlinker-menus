@@ -3,12 +3,10 @@
 namespace Fromholdio\SuperLinkerMenus\Model;
 
 use Fromholdio\GridFieldLimiter\Forms\GridFieldLimiter;
-use Fromholdio\SuperLinkerMenus\Extensions\MultisitesMenuSetExtension;
 use SilverStripe\Admin\LeftAndMain;
 use SilverStripe\Control\Controller;
 use SilverStripe\Core\ClassInfo;
 use SilverStripe\Core\Config\Config;
-use SilverStripe\Core\Manifest\ModuleLoader;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\GridField\GridField;
 use SilverStripe\Forms\GridField\GridFieldAddExistingAutocompleter;
@@ -22,19 +20,13 @@ use SilverStripe\Forms\HiddenField;
 use SilverStripe\Forms\Tab;
 use SilverStripe\Forms\TabSet;
 use SilverStripe\Forms\TextField;
-use SilverStripe\ORM\DataList;
 use SilverStripe\ORM\DataObject;
-use SilverStripe\Security\Permission;
-use SilverStripe\Security\PermissionProvider;
-use SilverStripe\SiteConfig\SiteConfig;
 use SilverStripe\Versioned\Versioned;
 use SilverStripe\View\SSViewer;
 use Symbiote\GridFieldExtensions\GridFieldAddNewMultiClass;
 use Symbiote\GridFieldExtensions\GridFieldOrderableRows;
-use Symbiote\Multisites\Model\Site;
-use Symbiote\Multisites\Multisites;
 
-class MenuSet extends DataObject implements PermissionProvider
+class MenuSet extends DataObject
 {
     private static $table_name = 'MenuSet';
     private static $singular_name = 'Menu';
@@ -85,17 +77,33 @@ class MenuSet extends DataObject implements PermissionProvider
         return $this->Items();
     }
 
-    public static function get_by_key($key)
+    public static function get_parent_class()
     {
-        return MenuSet::get()->find('Key', $key);
+        $class = static::singleton()->getRelationClass('Parent');
+        if (!$class) {
+            throw new \Exception(
+                'You must define a has_one relation named "Parent" on your MenuSet class.'
+            );
+        }
+        return $class;
     }
 
-    public static function update_menusets(DataList $menuSets = null, $themes = null)
+    public static function get_by_key($key, $parentID)
     {
-        if (is_null($menuSets)) {
-            $menuSets = self::get();
+        $parentClass = self::get_parent_class();
+        $parent = $parentClass::get()->byID($parentID);
+        if ($parent && $parent->exists()) {
+            return $parent->MenuSets()->find('Key', $key);
         }
-        if (!$themes) {
+        return null;
+    }
+
+    public static function update_menusets($parent)
+    {
+        $menuSets = $parent->MenuSets();
+        if ($parent->hasMethod('getMenuSetsThemes')) {
+            $themes = $parent->getMenuSetsThemes();
+        } else {
             $themes = SSViewer::get_themes();
         }
 
@@ -111,13 +119,17 @@ class MenuSet extends DataObject implements PermissionProvider
                     unset($configMenuSets[$menuSet->Key]);
                 }
                 else {
-                    $menuSet->doArchive();
+                    if ($menuSet->isVersioned()) {
+                        $menuSet->doArchive();
+                    } else {
+                        $menuSet->delete();
+                    }
                 }
             }
-
             foreach ($configMenuSets as $key => $data) {
                 $menuSet = self::create();
                 $menuSet->Key = $key;
+                $menuSet->ParentID = $parent->ID;
                 $menuSet = $menuSet->updateFromConfig($data);
                 $updatedMenuSetIDs[] = $menuSet->ID;
             }
@@ -125,22 +137,19 @@ class MenuSet extends DataObject implements PermissionProvider
         else {
             if ($menuSets->count() > 0) {
                 foreach ($menuSets as $menuSet) {
-                    $menuSet->doArchive();
+                    if ($menuSet->isVersioned()) {
+                        $menuSet->doArchive();
+                    } else {
+                        $menuSet->delete();
+                    }
                 }
             }
         }
-
-        if (count($updatedMenuSetIDs) < 1) {
-            return null;
-        }
-
-        return self::get()->filter('ID', $updatedMenuSetIDs);
     }
 
     public static function get_config_menusets($themes = null)
     {
         $menuSets = [];
-
         $config = Config::inst()->get(self::class, 'theme_menus');
         if (is_array($config)) {
             if ($themes) {
@@ -171,6 +180,30 @@ class MenuSet extends DataObject implements PermissionProvider
         return $menuSets;
     }
 
+    public function requireDefaultRecords()
+    {
+        $parentClass = self::get_parent_class();
+        $parents = $parentClass::get();
+        $parentIDs = $parents->columnUnique('ID');
+        if (count($parentIDs)) {
+            $menuSets = static::get()->exclude([
+                'ParentID' => $parentIDs
+            ]);
+            foreach ($menuSets as $menuSet) {
+                if ($menuSet->isVersioned()) {
+                    $menuSet->doArchive();
+                }
+                else {
+                    $menuSet->delete();
+                }
+            }
+        }
+        foreach ($parents as $parent) {
+            self::update_menusets($parent);
+        }
+        $this->extend('requireDefaultRecords', $dummy);
+    }
+
     public function getTitle()
     {
         $title = null;
@@ -196,7 +229,9 @@ class MenuSet extends DataObject implements PermissionProvider
             if ($data !== $this->Name) {
                 $this->Name = $data;
                 $this->write();
-                $this->publishSingle();
+                if ($this->isVersioned()) {
+                    $this->publishSingle();
+                }
             }
             return $this;
         }
@@ -246,24 +281,58 @@ class MenuSet extends DataObject implements PermissionProvider
 
         if ($doWrite) {
             $this->write();
-            $this->publishSingle();
+            if ($this->isVersioned()) {
+                $this->publishSingle();
+            }
         }
 
         return $this;
     }
 
-    public function requireDefaultRecords()
+    public function getMenuItemClasses()
     {
-        $isMultisites = ModuleLoader::inst()
-            ->getManifest()
-            ->moduleExists('symbiote/silverstripe-multisites');
+        $list = [];
+        $classes = ClassInfo::subclassesFor(MenuItem::class);
+        foreach ($classes as $class) {
+            $list[$class] = $class::singleton()->getMultiAddTitle();
+        }
+        asort($list);
+        if (array_key_exists(MenuItem::class, $list)) {
+            unset($list[MenuItem::class]);
+        }
+        $this->extend('updateMenuItemClasses', $list);
+        return $list;
+    }
 
-        if ($isMultisites) {
-            MultisitesMenuSetExtension::update_menusets_multisites();
+    public function isVersioned()
+    {
+        return $this->hasExtension(Versioned::class);
+    }
+
+    public function validate()
+    {
+        $result = parent::validate();
+
+        if ($this->Key) {
+            $sameKeyMenuSets = self::get()
+                ->filter([
+                    'Key' => $this->Key,
+                    'ParentID' => $this->ParentID
+                ])
+                ->exclude('ID', $this->ID);
+            if ($sameKeyMenuSets->count() > 0) {
+                $result->addFieldError('Key', 'You must use a unique key');
+            }
         }
         else {
-            self::update_menusets();
+            $result->addFieldError('Key', 'You must provide a key');
         }
+
+        if (!$this->Name) {
+            $result->addFieldError('Name', 'You must provide a name');
+        }
+
+        return $result;
     }
 
     public function getCMSFields()
@@ -319,74 +388,6 @@ class MenuSet extends DataObject implements PermissionProvider
         return $fields;
     }
 
-    public function validate()
-    {
-        $result = parent::validate();
-
-        if ($this->Key) {
-            $sameKeyMenuSets = self::get()
-                ->filter('Key', $this->Key)
-                ->exclude('ID', $this->ID);
-            if ($sameKeyMenuSets->count() > 0) {
-                $result->addFieldError('Key', 'You must use a unique key');
-            }
-        }
-        else {
-            $result->addFieldError('Key', 'You must provide a key');
-        }
-
-        if (!$this->Name) {
-            $result->addFieldError('Name', 'You must provide a name');
-        }
-
-        return $result;
-    }
-
-    public function getMenuItemClasses()
-    {
-        $list = [];
-        $classes = ClassInfo::subclassesFor(MenuItem::class);
-        foreach ($classes as $class) {
-            $list[$class] = $class::singleton()->getMultiAddTitle();
-        }
-        asort($list);
-        if (array_key_exists(MenuItem::class, $list)) {
-            unset($list[MenuItem::class]);
-        }
-        $this->extend('updateMenuItemClasses', $list);
-        return $list;
-    }
-
-    public function CMSEditLink()
-    {
-        $siteConfig = SiteConfig::current_site_config();
-        $link = Controller::join_links(
-            $siteConfig->CMSEditLink(),
-            'EditForm/field/MenuSets/item',
-            $this->ID
-        );
-        $this->extend('updateCMSEditLink', $link);
-        return $link;
-    }
-
-    public function getPermissionKey()
-    {
-        return 'MENUS_EDIT_' . $this->obj('Key')->Uppercase();
-    }
-
-    public function providePermissions()
-    {
-        $permissions = [];
-        foreach (self::get() as $menuSet) {
-            $key = $menuSet->getPermissionKey();
-            $permissions[$key] = [
-                'name' => 'Manage ' . $menuSet->obj('Name'),
-                'category' => 'Menus'
-            ];
-        }
-        return $permissions;
-    }
-
     public function canCreate($member = null, $context = null)
     {
         return false;
@@ -399,11 +400,19 @@ class MenuSet extends DataObject implements PermissionProvider
 
     public function canEdit($member = null)
     {
-        return Permission::check($this->getPermissionKey(), 'any', $member);
+        $can = $this->Parent()->canEdit($member);
+        if ($can === false) {
+            return false;
+        }
+        return parent::canEdit($member);
     }
 
     public function canView($member = null)
     {
-        return Permission::check($this->getPermissionKey(), 'any', $member);
+        $can = $this->Parent()->canView($member);
+        if ($can === false) {
+            return false;
+        }
+        return parent::canView($member);
     }
 }

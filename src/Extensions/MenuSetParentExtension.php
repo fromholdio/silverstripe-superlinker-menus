@@ -3,6 +3,7 @@
 namespace Fromholdio\SuperLinkerMenus\Extensions;
 
 use Fromholdio\SuperLinkerMenus\Model\MenuSet;
+use SilverStripe\Core\Manifest\ModuleLoader;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\GridField\GridField;
 use SilverStripe\Forms\GridField\GridFieldAddExistingAutocompleter;
@@ -12,14 +13,29 @@ use SilverStripe\Forms\GridField\GridFieldPageCount;
 use SilverStripe\Forms\GridField\GridFieldPaginator;
 use SilverStripe\Forms\GridField\GridFieldToolbarHeader;
 use SilverStripe\ORM\DataExtension;
+use Symbiote\Multisites\Model\Site;
 
-class MenusSiteConfigExtension extends DataExtension
+class MenuSetParentExtension extends DataExtension
 {
-    private static $menus_tab_path = 'Root.Menus';
+    private static $menusets_tab_path = 'Root.Menus';
+
+    private static $has_many = [
+        'MenuSets' => MenuSet::class
+    ];
+
+    private static $owns = [
+        'MenuSets'
+    ];
+
+    private static $cascade_deletes = [
+        'MenuSets'
+    ];
 
     public function updateCMSFields(FieldList $fields)
     {
-        $tabPath = $this->getMenusTabPath();
+        $fields->removeByName('MenuSets');
+
+        $tabPath = $this->getOwner()->getMenuSetsTabPath();
         if (!$tabPath) {
             return;
         }
@@ -30,7 +46,7 @@ class MenusSiteConfigExtension extends DataExtension
                 GridField::create(
                     'MenuSets',
                     'Menus',
-                    MenuSet::get(),
+                    $this->getOwner()->MenuSets(),
                     $config = GridFieldConfig_RecordEditor::create()
                 )
             ]
@@ -45,10 +61,19 @@ class MenusSiteConfigExtension extends DataExtension
         ]);
     }
 
-    public function getMenusTabPath()
+    public function updateSiteCMSFields(FieldList $fields)
     {
-        $path = $this->getOwner()->config()->get('menus_tab_path');
-        $this->getOwner()->invokeWithExtensions('updateMenusTabPath');
+        $multiSitesExists = ModuleLoader::inst()->getManifest()
+            ->moduleExists('symbiote/silverstripe-multisites');
+        if ($multiSitesExists && is_a($this->getOwner(), Site::class)) {
+            $this->updateCMSFields($fields);
+        }
+    }
+
+    public function getMenuSetsTabPath()
+    {
+        $path = $this->getOwner()->config()->get('menusets_tab_path');
+        $this->getOwner()->invokeWithExtensions('updateMenuSetsTabPath');
         return $path;
     }
 }
