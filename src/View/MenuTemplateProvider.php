@@ -22,7 +22,7 @@ class MenuTemplateProvider implements TemplateGlobalProvider
             if ($curr->hasMethod('getCurrentMenuSetParent')) {
                 $parent = $curr->getCurrentMenuSetParent();
                 if ($parent && $parent->exists()) {
-                    return MenuSet::get_by_key($key, $parentID);
+                    return MenuSet::get_by_key($key, $parent->ID);
                 }
             }
         }
