@@ -47,7 +47,7 @@ class MenuSetParentExtension extends DataExtension
                     'MenuSets',
                     'Menus',
                     $this->getOwner()->MenuSets(),
-                    $config = GridFieldConfig_RecordEditor::create()
+                    $config = GridFieldConfig_RecordEditor::create(null, true, false)
                 )
             ]
         );

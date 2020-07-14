@@ -41,6 +41,7 @@ class MenuSet extends DataObject
         'Name' => 'Varchar',
         'CustomTitle' => 'Varchar',
         'IsTitleEnabled' => 'Boolean',
+        'IsHighlightEnabled' => 'Boolean',
         'ItemsLimit' => 'Int',
         'MaxDepth' => 'Int',
         'Sort' => 'Int'
@@ -60,13 +61,14 @@ class MenuSet extends DataObject
 
     private static $defaults = [
         'IsTitleEnabled' => false,
+        'IsHighlightEnabled' => false,
         'ItemsLimit' => 0,
         'MaxDepth' => 0,
         'Sort' => 1
     ];
 
     private static $summary_fields = [
-        'Title',
+        'CMSTitle' => 'Title',
         'Items.Count' => 'Items'
     ];
 
@@ -204,6 +206,11 @@ class MenuSet extends DataObject
         $this->extend('requireDefaultRecords', $dummy);
     }
 
+    public function getCMSTitle()
+    {
+        return $this->getTitle();
+    }
+
     public function getTitle()
     {
         $title = null;
@@ -213,7 +220,7 @@ class MenuSet extends DataObject
         $curr = Controller::curr();
         if (is_a($curr, LeftAndMain::class)) {
             if ($title) {
-                $title .= ' (' . $this->Name . ')';
+                $title = $this->Name . ' - ' . $title;
             }
             else {
                 $title = $this->Name;
@@ -238,6 +245,20 @@ class MenuSet extends DataObject
 
         $doWrite = false;
 
+        if (isset($data['class'])) {
+            $class = $data['class'];
+            if (!is_a($class, MenuSet::class, true)) {
+                $class = MenuSet::class;
+            }
+        } else {
+            $class = MenuSet::class;
+        }
+
+        if (get_class($this) !== $class) {
+            $this->ClassName = $class;
+            $doWrite = true;
+        }
+
         if ($data['name'] !== $this->Name) {
             $this->Name = $data['name'];
             $doWrite = true;
@@ -253,6 +274,24 @@ class MenuSet extends DataObject
                 $this->IsTitleEnabled = false;
                 $doWrite = true;
             }
+        } else if ($this->IsTitleEnabled) {
+            $this->IsTitleEnabled = false;
+            $doWrite = true;
+        }
+
+        if (isset($data['enable_highlight'])) {
+            $isHighlightEnabled = (bool) $data['enable_highlight'];
+            if ($isHighlightEnabled && !$this->IsHighlightEnabled) {
+                $this->IsHighlightEnabled = true;
+                $doWrite = true;
+            }
+            else if (!$isHighlightEnabled && $this->IsHighlightEnabled) {
+                $this->IsHighlightEnabled = false;
+                $doWrite = true;
+            }
+        } else if ($this->IsHighlightEnabled) {
+            $this->IsHighlightEnabled = false;
+            $doWrite = true;
         }
 
         if (isset($data['limit'])) {
@@ -340,16 +379,21 @@ class MenuSet extends DataObject
         $fields = FieldList::create(
             TabSet::create(
                 'Root',
-                $mainTab = Tab::create(
+                $mainTabSet = TabSet::create(
+                    'MainTabSet',
                     'Main',
-                    HeaderField::create('NameHeader', $this->Name, 2)
+                    $menuItemsTab = Tab::create(
+                        'MenuItemsTab',
+                        'Menu Items',
+                        HeaderField::create('NameHeader', $this->Name, 2)
+                    )
                 )
             )
         );
 
         if ($this->IsTitleEnabled) {
-            $mainTab->push(
-                TextField::create('Title', $this->fieldLabel('Title'))
+            $menuItemsTab->push(
+                TextField::create('CustomTitle', $this->fieldLabel('Title'))
             );
         }
 
@@ -357,7 +401,7 @@ class MenuSet extends DataObject
             'Items',
             $this->fieldLabel('Items'),
             $this->Items(),
-            $itemsConfig = GridFieldConfig_RecordEditor::create()
+            $itemsConfig = GridFieldConfig_RecordEditor::create(null, true, false)
         );
 
         $itemsConfig
@@ -381,8 +425,8 @@ class MenuSet extends DataObject
 
         $itemsConfig->addComponent($itemsAdder);
 
-        $mainTab->push($itemsField);
-        $mainTab->push(HiddenField::create('ID', false));
+        $menuItemsTab->push($itemsField);
+        $menuItemsTab->push(HiddenField::create('ID', false));
 
         $this->extend('updateCMSFields', $fields);
         return $fields;

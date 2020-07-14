@@ -6,6 +6,8 @@ use Fromholdio\Sortable\Extensions\Sortable;
 use Fromholdio\SuperLinker\Model\SuperLink;
 use SilverStripe\CMS\Model\SiteTree;
 use SilverStripe\Control\Controller;
+use SilverStripe\Forms\CheckboxField;
+use SilverStripe\Forms\FieldGroup;
 use SilverStripe\Forms\GridField\GridField;
 use SilverStripe\Forms\GridField\GridFieldAddExistingAutocompleter;
 use SilverStripe\Forms\GridField\GridFieldAddNewButton;
@@ -46,7 +48,8 @@ class MenuItem extends SuperLink
     ];
 
     private static $db = [
-        'SubmenuMode' => 'Varchar(20)'
+        'SubmenuMode' => 'Varchar(20)',
+        'IsHighlighted' => 'Boolean'
     ];
 
     private static $has_one = [
@@ -89,6 +92,21 @@ class MenuItem extends SuperLink
             'SubmenuSiteTreeID'
         ]);
 
+        $submenuTab = $fields->findOrMakeTab('Root.Main.SuperLinkTargetTab');
+
+        if ($this->getCanBeHighlighted())
+        {
+            $highlightField = FieldGroup::create(
+                CheckboxField::create(
+                    'IsHighlighted',
+                    'Highlight this menu item'
+                )
+            );
+            $highlightField->setTitle('Style');
+            $highlightField->setName('IsHighlightedGroup');
+            $submenuTab->push($highlightField);
+        }
+
         if (!$this->getCanHaveChildren()) {
             return $fields;
         }
@@ -98,7 +116,6 @@ class MenuItem extends SuperLink
             return $fields;
         }
 
-        $submenuTab = Tab::create('SubmenuTab', 'Submenu');
         $menuTabSet = $fields->fieldByName('Root.Main');
 
         if (!$this->isInDB()) {
@@ -109,7 +126,6 @@ class MenuItem extends SuperLink
                     3
                 )
             );
-            $menuTabSet->push($submenuTab);
             return $fields;
         }
 
@@ -123,7 +139,6 @@ class MenuItem extends SuperLink
             $modeOptions
         );
         $submenuTab->push($modeField);
-        $menuTabSet->push($submenuTab);
 
         if (isset($modeOptions[self::SUBMENU_SITETREE])) {
 
@@ -170,6 +185,15 @@ class MenuItem extends SuperLink
 
         $this->extend('updateMenuItemCMSFields', $fields);
         return $fields;
+    }
+
+    public function getCanBeHighlighted()
+    {
+        $menuSet = $this->getRootMenuSet();
+        if (!$menuSet) {
+            return false;
+        }
+        return (bool) $menuSet->IsHighlightEnabled;
     }
 
     public function getCanHaveChildren()
