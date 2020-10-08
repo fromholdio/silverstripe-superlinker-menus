@@ -76,7 +76,16 @@ class MenuSet extends DataObject
 
     public function MenuItems()
     {
-        return $this->Items();
+        if (($items = $this->Items()) && $items->exists()) {
+            $output = ArrayList::create();
+            foreach ($items as $item) {
+                if ($item->HasTarget()) {
+                    $output->push($item);
+                }
+            }
+            return $output;
+        }
+        return null;
     }
 
     public static function get_parent_class()
