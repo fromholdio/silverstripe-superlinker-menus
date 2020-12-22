@@ -8,6 +8,9 @@ use SilverStripe\CMS\Model\SiteTree;
 use SilverStripe\Control\Controller;
 use SilverStripe\Forms\CheckboxField;
 use SilverStripe\Forms\FieldGroup;
+use SilverStripe\Forms\HeaderField;
+use SilverStripe\Forms\OptionsetField;
+use SilverStripe\Forms\TreeDropdownField;
 use SilverStripe\Forms\GridField\GridField;
 use SilverStripe\Forms\GridField\GridFieldAddExistingAutocompleter;
 use SilverStripe\Forms\GridField\GridFieldAddNewButton;
@@ -15,10 +18,6 @@ use SilverStripe\Forms\GridField\GridFieldConfig_RecordEditor;
 use SilverStripe\Forms\GridField\GridFieldPageCount;
 use SilverStripe\Forms\GridField\GridFieldPaginator;
 use SilverStripe\Forms\GridField\GridFieldToolbarHeader;
-use SilverStripe\Forms\HeaderField;
-use SilverStripe\Forms\OptionsetField;
-use SilverStripe\Forms\Tab;
-use SilverStripe\Forms\TreeDropdownField;
 use SilverStripe\Versioned\Versioned;
 use Symbiote\GridFieldExtensions\GridFieldAddNewMultiClass;
 use Symbiote\GridFieldExtensions\GridFieldOrderableRows;
@@ -285,10 +284,13 @@ class MenuItem extends SuperLink
     {
         $link = null;
         if ($this->ParentID) {
+            $link = $this->Parent()->CMSEditLink();
+            $link = preg_replace('/\/item\/([\d]+)\/edit/', '/item/$1', $link);
             $link = Controller::join_links(
-                $this->Parent()->CMSEditLink(),
+                $link,
                 'ItemEditForm/field/Children/item',
-                $this->ID
+                $this->ID,
+                'edit'
             );
         }
         else if ($this->MenuSetID) {
@@ -297,7 +299,8 @@ class MenuItem extends SuperLink
             $link = Controller::join_links(
                 $link,
                 'ItemEditForm/field/Items/item',
-                $this->ID
+                $this->ID,
+                'edit'
             );
         }
         $this->extend('updateCMSEditLink', $link);
