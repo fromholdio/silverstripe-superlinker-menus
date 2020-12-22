@@ -292,8 +292,10 @@ class MenuItem extends SuperLink
             );
         }
         else if ($this->MenuSetID) {
+            $link = $this->MenuSet()->CMSEditLink();
+            $link = preg_replace('/\/item\/([\d]+)\/edit/', '/item/$1', $link);
             $link = Controller::join_links(
-                $this->MenuSet()->CMSEditLink(),
+                $link,
                 'ItemEditForm/field/Items/item',
                 $this->ID
             );

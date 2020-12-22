@@ -440,6 +440,31 @@ class MenuSet extends DataObject
         $this->extend('updateCMSFields', $fields);
         return $fields;
     }
+	
+    public function CMSEditLink()
+    {
+        $link = null;
+        if ($this->ParentID) {
+            if (is_a($this->Parent(), SiteTree::class)) {
+                $link = Controller::join_links(
+                    singleton(CMSPageEditController::class)->Link('EditForm'),
+                    $this->ParentID,
+                    'field/MenuSets/item',
+                    $this->ID,
+                    'edit'
+                );
+            } elseif (is_a($this->Parent(), SiteConfig::class)) {
+                $link = Controller::join_links(
+                    singleton(SiteConfigLeftAndMain::class)->Link('EditForm'),
+                    'field/MenuSets/item',
+                    $this->ID,
+                    'edit'
+                );
+            }
+        }
+        $this->extend('updateCMSEditLink', $link);
+        return $link;
+    }
 
     public function canCreate($member = null, $context = null)
     {
