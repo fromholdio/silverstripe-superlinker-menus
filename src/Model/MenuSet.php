@@ -59,6 +59,10 @@ class MenuSet extends DataObject
         'Items'
     ];
 
+    private static $cascade_duplicates = [
+        'Items'
+    ];
+
     private static $defaults = [
         'IsTitleEnabled' => false,
         'IsHighlightEnabled' => false,
