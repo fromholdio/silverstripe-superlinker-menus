@@ -70,6 +70,10 @@ class MenuItem extends SuperLink
         'Children'
     ];
 
+    private static $cascade_duplicates = [
+        'Children'
+    ];
+
     private static $field_labels = [
         'SubmenuMode' => 'Submenu',
         'SubmenuSiteTree' => 'Select Page'
