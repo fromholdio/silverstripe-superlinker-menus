@@ -19,12 +19,14 @@ use SilverStripe\Forms\HeaderField;
 use SilverStripe\Forms\OptionsetField;
 use SilverStripe\Forms\Tab;
 use SilverStripe\Forms\TreeDropdownField;
+use SilverStripe\Security\Permission;
+use SilverStripe\Security\PermissionProvider;
 use SilverStripe\Versioned\Versioned;
 use Symbiote\GridFieldExtensions\GridFieldAddNewMultiClass;
 use Symbiote\GridFieldExtensions\GridFieldOrderableRows;
 use UncleCheese\DisplayLogic\Forms\Wrapper;
 
-class MenuItem extends SuperLink
+class MenuItem extends SuperLink implements PermissionProvider
 {
     const SUBMENU_SITETREE = 'sitetree';
     const SUBMENU_MANUAL = 'manual';
@@ -308,33 +310,62 @@ class MenuItem extends SuperLink
 
     public function canView($member = null)
     {
-        if ($this->ParentID) {
-            return $this->Parent()->canView($member);
+        $can = Permission::checkMember($member, 'MANAGE_MENUITEMS');
+        if ($can) {
+            if ($this->ParentID) {
+                $can = $this->Parent()->canView($member, $context);
+            }
         }
-        return $this->MenuSet()->canView($member);
+        return $can;
     }
 
     public function canEdit($member = null)
     {
-        if ($this->ParentID) {
-            return $this->Parent()->canEdit($member);
+        $can = Permission::checkMember($member, 'MANAGE_MENUITEMS');
+        if ($can) {
+            if ($this->ParentID) {
+                $can = $this->Parent()->canEdit($member, $context);
+            }
         }
-        return $this->MenuSet()->canEdit($member);
+        return $can;
     }
 
     public function canDelete($member = null)
     {
-        if ($this->ParentID) {
-            return $this->Parent()->canDelete($member);
+        $can = Permission::checkMember($member, 'DELETE_MENUITEMS');
+        if ($can) {
+            if ($this->ParentID) {
+                $can = $this->Parent()->canDelete($member, $context);
+            }
         }
-        return $this->MenuSet()->canDelete($member);
+        return $can;
     }
 
     public function canCreate($member = null, $context = [])
     {
-        if ($this->ParentID) {
-            return $this->Parent()->canCreate($member, $context);
+        $can = Permission::checkMember($member, 'CREATE_MENUITEMS');
+        if ($can) {
+            if ($this->ParentID) {
+                $can = $this->Parent()->canCreate($member, $context);
+            }
         }
-        return $this->MenuSet()->canEdit($member);
+        return $can;
+    }
+
+    public function providePermissions() {
+        return [
+            'MANAGE_MENUITEMS' => array(
+                'name' => 'Manage menu items',
+                'category' => 'Menus',
+            ),
+            'CREATE_MENUITEMS' => array(
+                'name' => 'Create menu items',
+                'category' => 'Menus',
+            ),
+            'DELETE_MENUITEMS' => array(
+                'name' => 'Delete menu items',
+                'category' => 'Menus',
+            )
+        ];
     }
 }
