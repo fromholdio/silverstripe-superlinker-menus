@@ -31,6 +31,10 @@ class MenuSetParentExtension extends DataExtension
         'MenuSets'
     ];
 
+    private static $cascade_duplicates = [
+        'MenuSets'
+    ];
+
     public function updateCMSFields(FieldList $fields)
     {
         $fields->removeByName('MenuSets');
