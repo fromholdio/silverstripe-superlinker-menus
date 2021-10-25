@@ -3,9 +3,6 @@
 namespace Fromholdio\SuperLinkerMenus\Model;
 
 use Fromholdio\SuperLinker\Extensions\SiteTreeLink;
-use SilverStripe\Forms\CheckboxField;
-use SilverStripe\Forms\FieldGroup;
-use UncleCheese\DisplayLogic\Forms\Wrapper;
 
 class MenuItemSiteTree extends MenuItem
 {
