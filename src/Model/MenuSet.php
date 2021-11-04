@@ -26,12 +26,14 @@ use SilverStripe\ORM\ArrayList;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\SiteConfig\SiteConfig;
 use SilverStripe\SiteConfig\SiteConfigLeftAndMain;
+use SilverStripe\Security\Permission;
+use SilverStripe\Security\PermissionProvider;
 use SilverStripe\Versioned\Versioned;
 use SilverStripe\View\SSViewer;
 use Symbiote\GridFieldExtensions\GridFieldAddNewMultiClass;
 use Symbiote\GridFieldExtensions\GridFieldOrderableRows;
 
-class MenuSet extends DataObject
+class MenuSet extends DataObject implements PermissionProvider
 {
     private static $table_name = 'MenuSet';
     private static $singular_name = 'Menu';
@@ -61,6 +63,10 @@ class MenuSet extends DataObject
     ];
 
     private static $cascade_deletes = [
+        'Items'
+    ];
+
+    private static $cascade_duplicates = [
         'Items'
     ];
 
@@ -473,29 +479,46 @@ class MenuSet extends DataObject
 
     public function canCreate($member = null, $context = null)
     {
-        return false;
+        return Permission::checkMember($member, 'CREATE_MENUSETS');
     }
 
     public function canDelete($member = null)
     {
-        return false;
+        return Permission::checkMember($member, 'DELETE_MENUSETS');
     }
 
     public function canEdit($member = null)
     {
-        $can = $this->Parent()->canEdit($member);
-        if ($can === false) {
-            return false;
+        $can = Permission::checkMember($member, 'MANAGE_MENUSETS');
+        if ($can) {
+            $can = $this->Parent()->canEdit($member);
         }
-        return parent::canEdit($member);
+        return $can;
     }
 
     public function canView($member = null)
     {
-        $can = $this->Parent()->canView($member);
-        if ($can === false) {
-            return false;
+        $can = Permission::checkMember($member, 'MANAGE_MENUSETS');
+        if ($can) {
+            $can = $this->Parent()->canView($member);
         }
-        return parent::canView($member);
+        return $can;
+    }
+
+    public function providePermissions() {
+        return [
+            'MANAGE_MENUSETS' => array(
+                'name' => 'Manage menu sets',
+                'category' => 'Menus',
+            ),
+            'CREATE_MENUSETS' => array(
+                'name' => 'Create menu sets',
+                'category' => 'Menus',
+            ),
+            'DELETE_MENUSETS' => array(
+                'name' => 'Delete menu sets',
+                'category' => 'Menus',
+            )
+        ];
     }
 }
