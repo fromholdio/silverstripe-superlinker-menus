@@ -4,6 +4,8 @@ namespace Fromholdio\SuperLinkerMenus\Model;
 
 use Fromholdio\GridFieldLimiter\Forms\GridFieldLimiter;
 use SilverStripe\Admin\LeftAndMain;
+use SilverStripe\CMS\Controllers\CMSPageEditController;
+use SilverStripe\CMS\Model\SiteTree;
 use SilverStripe\Control\Controller;
 use SilverStripe\Core\ClassInfo;
 use SilverStripe\Core\Config\Config;
@@ -22,6 +24,8 @@ use SilverStripe\Forms\GridField\GridFieldPaginator;
 use SilverStripe\Forms\GridField\GridFieldToolbarHeader;
 use SilverStripe\ORM\ArrayList;
 use SilverStripe\ORM\DataObject;
+use SilverStripe\SiteConfig\SiteConfig;
+use SilverStripe\SiteConfig\SiteConfigLeftAndMain;
 use SilverStripe\Security\Permission;
 use SilverStripe\Security\PermissionProvider;
 use SilverStripe\Versioned\Versioned;
@@ -446,6 +450,31 @@ class MenuSet extends DataObject implements PermissionProvider
 
         $this->extend('updateCMSFields', $fields);
         return $fields;
+    }
+
+    public function CMSEditLink()
+    {
+        $link = null;
+        if ($this->ParentID) {
+            if (is_a($this->Parent(), SiteTree::class)) {
+                $link = Controller::join_links(
+                    singleton(CMSPageEditController::class)->Link('EditForm'),
+                    $this->ParentID,
+                    'field/MenuSets/item',
+                    $this->ID,
+                    'edit'
+                );
+            } elseif (is_a($this->Parent(), SiteConfig::class)) {
+                $link = Controller::join_links(
+                    singleton(SiteConfigLeftAndMain::class)->Link('EditForm'),
+                    'field/MenuSets/item',
+                    $this->ID,
+                    'edit'
+                );
+            }
+        }
+        $this->extend('updateCMSEditLink', $link);
+        return $link;
     }
 
     public function canCreate($member = null, $context = null)
