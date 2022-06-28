@@ -316,8 +316,8 @@ class MenuSet extends DataObject implements PermissionProvider
 
         if (isset($data['limit'])) {
             $limit = (int) $data['limit'];
-            if ($limit !== (int) $this->Limit) {
-                $this->Limit = $limit;
+            if ($limit !== (int) $this->ItemsLimit) {
+                $this->ItemsLimit = $limit;
                 $doWrite = true;
             }
         }
@@ -437,8 +437,8 @@ class MenuSet extends DataObject implements PermissionProvider
         $itemsAdder = new GridFieldAddNewMultiClass();
         $itemsAdder->setClasses($this->getMenuItemClasses());
 
-        if ($this->Limit > 0) {
-            $itemsLimiter = new GridFieldLimiter($this->Limit, 'before', true);
+        if ($this->ItemsLimit > 0) {
+            $itemsLimiter = new GridFieldLimiter($this->ItemsLimit, 'before', true);
             $itemsConfig->addComponent($itemsLimiter);
             $itemsAdder->setFragment('limiter-before-left');
         }
