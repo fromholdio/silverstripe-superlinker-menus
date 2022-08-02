@@ -1,3 +1,7 @@
 ---
 Name: fromholdio-superlinker-menus
 ---
+
+SilverStripe\Control\Controller:
+  extensions:
+    menuSetParent: Fromholdio\SuperLinkerMenus\Extensions\MenuSetParentAccessorExtension
