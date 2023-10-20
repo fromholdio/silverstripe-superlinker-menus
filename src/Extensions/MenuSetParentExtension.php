@@ -23,10 +23,6 @@ class MenuSetParentExtension extends DataExtension
         'MenuSets' => MenuSet::class
     ];
 
-    private static $owns = [
-        'MenuSets'
-    ];
-
     private static $cascade_deletes = [
         'MenuSets'
     ];
