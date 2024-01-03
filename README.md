@@ -1,5 +1,11 @@
 # silverstripe-superlinker-menus
 
+Use master/v4.x (compatible with SS 4 & 5).
+
+This branch is under active development. It **will** change and break, likely including namespaces.
+
+## Summary
+
 A SilverStripe menu management built using the Superlinker foundation
 
 ## Requirements
@@ -10,6 +16,10 @@ A SilverStripe menu management built using the Superlinker foundation
 
 `composer require fromholdio/silverstripe-superlinker-menus`
 
-## Details & Usage
+## Todos
 
-Docs
+- Validation
+- Finalise naming, consolidate & finalise
+- Proper i18n/_t()/translations
+- Migration script for v4 to v5
+- Documentation/readme

@@ -7,30 +7,27 @@ use SilverStripe\Admin\LeftAndMain;
 use SilverStripe\CMS\Controllers\CMSPageEditController;
 use SilverStripe\CMS\Model\SiteTree;
 use SilverStripe\Control\Controller;
-use SilverStripe\Core\ClassInfo;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\Forms\FieldList;
+use SilverStripe\Forms\GridField\GridField;
+use SilverStripe\Forms\GridField\GridFieldAddExistingAutocompleter;
+use SilverStripe\Forms\GridField\GridFieldConfig_RecordEditor;
+use SilverStripe\Forms\GridField\GridFieldPageCount;
+use SilverStripe\Forms\GridField\GridFieldPaginator;
+use SilverStripe\Forms\GridField\GridFieldToolbarHeader;
 use SilverStripe\Forms\HeaderField;
 use SilverStripe\Forms\HiddenField;
 use SilverStripe\Forms\Tab;
 use SilverStripe\Forms\TabSet;
 use SilverStripe\Forms\TextField;
-use SilverStripe\Forms\GridField\GridField;
-use SilverStripe\Forms\GridField\GridFieldAddExistingAutocompleter;
-use SilverStripe\Forms\GridField\GridFieldAddNewButton;
-use SilverStripe\Forms\GridField\GridFieldConfig_RecordEditor;
-use SilverStripe\Forms\GridField\GridFieldPageCount;
-use SilverStripe\Forms\GridField\GridFieldPaginator;
-use SilverStripe\Forms\GridField\GridFieldToolbarHeader;
 use SilverStripe\ORM\ArrayList;
 use SilverStripe\ORM\DataObject;
-use SilverStripe\SiteConfig\SiteConfig;
-use SilverStripe\SiteConfig\SiteConfigLeftAndMain;
 use SilverStripe\Security\Permission;
 use SilverStripe\Security\PermissionProvider;
+use SilverStripe\SiteConfig\SiteConfig;
+use SilverStripe\SiteConfig\SiteConfigLeftAndMain;
 use SilverStripe\Versioned\Versioned;
 use SilverStripe\View\SSViewer;
-use Symbiote\GridFieldExtensions\GridFieldAddNewMultiClass;
 use Symbiote\GridFieldExtensions\GridFieldOrderableRows;
 
 class MenuSet extends DataObject implements PermissionProvider
@@ -38,10 +35,6 @@ class MenuSet extends DataObject implements PermissionProvider
     private static $table_name = 'MenuSet';
     private static $singular_name = 'Menu';
     private static $plural_name = 'Menus';
-
-    private static $extensions = [
-        Versioned::class
-    ];
 
     private static $db = [
         'Key' => 'Varchar(50)',
@@ -84,6 +77,8 @@ class MenuSet extends DataObject implements PermissionProvider
     ];
 
     private static $default_sort = 'Sort';
+
+    private static $menu_item_class = MenuItem::class;
 
     public function MenuItems()
     {
@@ -348,19 +343,11 @@ class MenuSet extends DataObject implements PermissionProvider
         return $this;
     }
 
-    public function getMenuItemClasses()
+    public function getMenuItemClass()
     {
-        $list = [];
-        $classes = ClassInfo::subclassesFor(MenuItem::class);
-        foreach ($classes as $class) {
-            $list[$class] = $class::singleton()->getMultiAddTitle();
-        }
-        asort($list);
-        if (array_key_exists(MenuItem::class, $list)) {
-            unset($list[MenuItem::class]);
-        }
-        $this->extend('updateMenuItemClasses', $list);
-        return $list;
+        $class = $this->config()->get('menu_item_class');
+        $this->extend('updateMenuItemClass', $class);
+        return $class;
     }
 
     public function isVersioned()
@@ -426,7 +413,6 @@ class MenuSet extends DataObject implements PermissionProvider
 
         $itemsConfig
             ->removeComponentsByType([
-                GridFieldAddNewButton::class,
                 GridFieldAddExistingAutocompleter::class,
                 GridFieldPageCount::class,
                 GridFieldPaginator::class,
@@ -434,16 +420,10 @@ class MenuSet extends DataObject implements PermissionProvider
             ])
             ->addComponent(new GridFieldOrderableRows());
 
-        $itemsAdder = new GridFieldAddNewMultiClass();
-        $itemsAdder->setClasses($this->getMenuItemClasses());
-
         if ($this->ItemsLimit > 0) {
             $itemsLimiter = new GridFieldLimiter($this->ItemsLimit, 'before', true);
             $itemsConfig->addComponent($itemsLimiter);
-            $itemsAdder->setFragment('limiter-before-left');
         }
-
-        $itemsConfig->addComponent($itemsAdder);
 
         $menuItemsTab->push($itemsField);
         $menuItemsTab->push(HiddenField::create('ID', false));

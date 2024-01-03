@@ -8,20 +8,18 @@ use SilverStripe\CMS\Model\SiteTree;
 use SilverStripe\Control\Controller;
 use SilverStripe\Forms\CheckboxField;
 use SilverStripe\Forms\FieldGroup;
-use SilverStripe\Forms\HeaderField;
-use SilverStripe\Forms\OptionsetField;
-use SilverStripe\Forms\TreeDropdownField;
+use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\GridField\GridField;
 use SilverStripe\Forms\GridField\GridFieldAddExistingAutocompleter;
-use SilverStripe\Forms\GridField\GridFieldAddNewButton;
 use SilverStripe\Forms\GridField\GridFieldConfig_RecordEditor;
 use SilverStripe\Forms\GridField\GridFieldPageCount;
 use SilverStripe\Forms\GridField\GridFieldPaginator;
 use SilverStripe\Forms\GridField\GridFieldToolbarHeader;
+use SilverStripe\Forms\HeaderField;
+use SilverStripe\Forms\OptionsetField;
+use SilverStripe\Forms\TreeDropdownField;
 use SilverStripe\Security\Permission;
 use SilverStripe\Security\PermissionProvider;
-use SilverStripe\Versioned\Versioned;
-use Symbiote\GridFieldExtensions\GridFieldAddNewMultiClass;
 use Symbiote\GridFieldExtensions\GridFieldOrderableRows;
 use UncleCheese\DisplayLogic\Forms\Wrapper;
 
@@ -45,7 +43,6 @@ class MenuItem extends SuperLink implements PermissionProvider
 
     private static $extensions = [
         Sortable::class,
-        Versioned::class
     ];
 
     private static $db = [
@@ -81,11 +78,11 @@ class MenuItem extends SuperLink implements PermissionProvider
     ];
 
     private static $summary_fields = [
-        'Title' => 'Link',
-        'Link' => 'URL'
+        'Title' => 'Title',
+        'URL' => 'URL'
     ];
 
-    public function getCMSFields()
+    public function getCMSFields(): FieldList
     {
         $fields = parent::getCMSFields();
 
@@ -97,7 +94,6 @@ class MenuItem extends SuperLink implements PermissionProvider
             'SubmenuSiteTreeID'
         ]);
 
-        $submenuTab = $fields->findOrMakeTab('Root.Main.SuperLinkTargetTab');
 
         if ($this->getCanBeHighlighted())
         {
@@ -109,7 +105,10 @@ class MenuItem extends SuperLink implements PermissionProvider
             );
             $highlightField->setTitle('Style');
             $highlightField->setName('IsHighlightedGroup');
-            $submenuTab->push($highlightField);
+            $fields->addFieldToTab(
+                'Root.Main',
+                $highlightField
+            );
         }
 
         if (!$this->getCanHaveChildren()) {
@@ -121,7 +120,7 @@ class MenuItem extends SuperLink implements PermissionProvider
             return $fields;
         }
 
-        $menuTabSet = $fields->fieldByName('Root.Main');
+        $submenuTab = $fields->findOrMakeTab('Root.Submenu');
 
         if (!$this->isInDB()) {
             $submenuTab->push(
@@ -168,7 +167,6 @@ class MenuItem extends SuperLink implements PermissionProvider
 
             $childrenConfig
                 ->removeComponentsByType([
-                    GridFieldAddNewButton::class,
                     GridFieldAddExistingAutocompleter::class,
                     GridFieldPageCount::class,
                     GridFieldPaginator::class,
@@ -176,12 +174,7 @@ class MenuItem extends SuperLink implements PermissionProvider
                 ])
                 ->addComponents([
                     new GridFieldOrderableRows(),
-                    $childrenAdder = new GridFieldAddNewMultiClass()
                 ]);
-
-            $childrenAdder->setClasses(
-                $this->getRootMenuSet()->getMenuItemClasses()
-            );
 
             $childrenWrapper = Wrapper::create($childrenField);
             $childrenWrapper->displayIf('SubmenuMode')->isEqualTo(self::SUBMENU_MANUAL);

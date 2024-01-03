@@ -14,11 +14,11 @@
     }],
     "require": {
         "silverstripe/cms": "~4.0 || ~5.0",
-        "fromholdio/silverstripe-dependentgroupeddropdownfield": "^1.0.0 || ^2.0.0",
+        "fromholdio/silverstripe-dependentgroupeddropdownfield": "^1.0.0 || ^2.0.0 || ^3.0.0",
         "fromholdio/silverstripe-externalurlfield": "^1.0.3",
         "fromholdio/silverstripe-globalanchors": "^1.0.1 || ^2.0.0",
         "fromholdio/silverstripe-sortable": "^3.0.0",
-        "fromholdio/silverstripe-superlinker": "^2.1.0",
+        "fromholdio/silverstripe-superlinker": "3.x-dev",
         "symbiote/silverstripe-gridfieldextensions": "^3.2.0 || ^4.0.0",
         "unclecheese/display-logic": "^2.0.0 || ^3.0.0"
     },
