@@ -13,7 +13,6 @@ use SilverStripe\Forms\GridField\GridFieldPageCount;
 use SilverStripe\Forms\GridField\GridFieldPaginator;
 use SilverStripe\Forms\GridField\GridFieldToolbarHeader;
 use SilverStripe\ORM\DataExtension;
-use Symbiote\Multisites\Model\Site;
 
 class MenuSetParentExtension extends DataExtension
 {
@@ -63,11 +62,22 @@ class MenuSetParentExtension extends DataExtension
 
     public function updateSiteCMSFields(FieldList $fields)
     {
-        $multiSitesExists = ModuleLoader::inst()->getManifest()
-            ->moduleExists('symbiote/silverstripe-multisites');
-        if ($multiSitesExists && is_a($this->getOwner(), Site::class)) {
+        $siteClass = $this->getOwner()->getMultisitesSiteClassName();
+        if (!empty($siteClass) && is_a($this->getOwner(), $siteClass)) {
             $this->updateCMSFields($fields);
         }
+    }
+
+    public function getMultisitesSiteClassName(): ?string
+    {
+        $manifest = ModuleLoader::inst()->getManifest();
+        if ($manifest->moduleExists('symbiote/silverstripe-multisites')) {
+            return \Symbiote\Multisites\Model\Site::class;
+        }
+        if ($manifest->moduleExists('fromholdio/silverstripe-configured-multisites')) {
+            return \Fromholdio\ConfiguredMultisites\Model\Site::class;
+        }
+        return null;
     }
 
     public function getMenuSetsTabPath()
