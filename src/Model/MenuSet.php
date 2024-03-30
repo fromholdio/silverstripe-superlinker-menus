@@ -85,7 +85,7 @@ class MenuSet extends DataObject implements PermissionProvider
         if (($items = $this->Items()) && $items->exists()) {
             $output = ArrayList::create();
             foreach ($items as $item) {
-                if ($item->HasTarget()) {
+                if ($item->isLinkValid()) {
                     $output->push($item);
                 }
             }
