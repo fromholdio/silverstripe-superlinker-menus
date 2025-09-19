@@ -27,5 +27,10 @@
         }
     },
     "prefer-stable": true,
-    "minimum-stability": "dev"
+    "minimum-stability": "dev",
+    "extra": {
+        "branch-alias": {
+            "dev-fixes/ss6-support": "6.0.x-dev"
+        }
+    }
 }
