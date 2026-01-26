@@ -19,7 +19,7 @@ class MenuTemplateProvider implements TemplateGlobalProvider
     {
         if (!$parentID) {
             $curr = Controller::curr();
-            if ($curr->hasMethod('getCurrentMenuSetParent')) {
+            if ($curr && $curr->hasMethod('getCurrentMenuSetParent')) {
                 $parent = $curr->getCurrentMenuSetParent();
                 if ($parent && $parent->exists()) {
                     return MenuSet::get_by_key($key, $parent->ID);
