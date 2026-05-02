@@ -8,6 +8,7 @@ use SilverStripe\CMS\Controllers\CMSPageEditController;
 use SilverStripe\CMS\Model\SiteTree;
 use SilverStripe\Control\Controller;
 use SilverStripe\Core\Config\Config;
+use SilverStripe\Core\Validation\ValidationResult;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\GridField\GridField;
 use SilverStripe\Forms\GridField\GridFieldAddExistingAutocompleter;
@@ -20,7 +21,7 @@ use SilverStripe\Forms\HiddenField;
 use SilverStripe\Forms\Tab;
 use SilverStripe\Forms\TabSet;
 use SilverStripe\Forms\TextField;
-use SilverStripe\ORM\ArrayList;
+use SilverStripe\Model\List\ArrayList;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\Security\Permission;
 use SilverStripe\Security\PermissionProvider;
@@ -197,7 +198,7 @@ class MenuSet extends DataObject implements PermissionProvider
         return $menuSets;
     }
 
-    public function requireDefaultRecords()
+    public function requireDefaultRecords(): void
     {
         $parentClass = self::get_parent_class();
         $parents = $parentClass::get();
@@ -355,7 +356,7 @@ class MenuSet extends DataObject implements PermissionProvider
         return $this->hasExtension(Versioned::class);
     }
 
-    public function validate()
+    public function validate(): ValidationResult
     {
         $result = parent::validate();
 

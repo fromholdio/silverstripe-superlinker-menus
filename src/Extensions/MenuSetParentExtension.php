@@ -3,6 +3,7 @@
 namespace Fromholdio\SuperLinkerMenus\Extensions;
 
 use Fromholdio\SuperLinkerMenus\Model\MenuSet;
+use SilverStripe\Core\Extension;
 use SilverStripe\Core\Manifest\ModuleLoader;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\GridField\GridField;
@@ -12,9 +13,8 @@ use SilverStripe\Forms\GridField\GridFieldConfig_RecordEditor;
 use SilverStripe\Forms\GridField\GridFieldPageCount;
 use SilverStripe\Forms\GridField\GridFieldPaginator;
 use SilverStripe\Forms\GridField\GridFieldToolbarHeader;
-use SilverStripe\ORM\DataExtension;
 
-class MenuSetParentExtension extends DataExtension
+class MenuSetParentExtension extends Extension
 {
     private static $menusets_tab_path = 'Root.Menus';
 
