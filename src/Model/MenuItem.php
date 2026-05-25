@@ -311,7 +311,7 @@ class MenuItem extends SuperLink implements PermissionProvider
         $can = Permission::checkMember($member, 'MANAGE_MENUITEMS');
         if ($can) {
             if ($this->ParentID) {
-                $can = $this->Parent()->canView($member, $context);
+                $can = $this->Parent()->canView($member);
             }
         }
         return $can;
@@ -322,7 +322,7 @@ class MenuItem extends SuperLink implements PermissionProvider
         $can = Permission::checkMember($member, 'MANAGE_MENUITEMS');
         if ($can) {
             if ($this->ParentID) {
-                $can = $this->Parent()->canEdit($member, $context);
+                $can = $this->Parent()->canEdit($member);
             }
         }
         return $can;
@@ -333,7 +333,7 @@ class MenuItem extends SuperLink implements PermissionProvider
         $can = Permission::checkMember($member, 'DELETE_MENUITEMS');
         if ($can) {
             if ($this->ParentID) {
-                $can = $this->Parent()->canDelete($member, $context);
+                $can = $this->Parent()->canDelete($member);
             }
         }
         return $can;
