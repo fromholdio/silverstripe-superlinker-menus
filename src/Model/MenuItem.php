@@ -279,28 +279,32 @@ class MenuItem extends SuperLink implements PermissionProvider
             ->exclude('ID', $this->ID);
     }
 
-    public function CMSEditLink()
+    public function getCMSEditLink(): ?string
     {
         $link = null;
         if ($this->ParentID) {
-            $link = $this->Parent()->CMSEditLink();
-            $link = preg_replace('/\/item\/([\d]+)\/edit/', '/item/$1', $link);
-            $link = Controller::join_links(
-                $link,
-                'ItemEditForm/field/Children/item',
-                $this->ID,
-                'edit'
-            );
+            $link = $this->Parent()->getCMSEditLink();
+            if ($link) {
+                $link = preg_replace('/\/item\/([\d]+)\/edit/', '/item/$1', $link);
+                $link = Controller::join_links(
+                    $link,
+                    'ItemEditForm/field/Children/item',
+                    $this->ID,
+                    'edit'
+                );
+            }
         }
         else if ($this->MenuSetID) {
-            $link = $this->MenuSet()->CMSEditLink();
-            $link = preg_replace('/\/item\/([\d]+)\/edit/', '/item/$1', $link);
-            $link = Controller::join_links(
-                $link,
-                'ItemEditForm/field/Items/item',
-                $this->ID,
-                'edit'
-            );
+            $link = $this->MenuSet()->getCMSEditLink();
+            if ($link) {
+                $link = preg_replace('/\/item\/([\d]+)\/edit/', '/item/$1', $link);
+                $link = Controller::join_links(
+                    $link,
+                    'ItemEditForm/field/Items/item',
+                    $this->ID,
+                    'edit'
+                );
+            }
         }
         $this->extend('updateCMSEditLink', $link);
         return $link;

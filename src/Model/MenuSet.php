@@ -433,7 +433,7 @@ class MenuSet extends DataObject implements PermissionProvider
         return $fields;
     }
 
-    public function CMSEditLink()
+    public function getCMSEditLink(): ?string
     {
         $link = null;
         if ($this->ParentID) {
