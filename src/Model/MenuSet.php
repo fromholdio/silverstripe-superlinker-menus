@@ -17,7 +17,6 @@ use SilverStripe\Forms\GridField\GridFieldPageCount;
 use SilverStripe\Forms\GridField\GridFieldPaginator;
 use SilverStripe\Forms\GridField\GridFieldToolbarHeader;
 use SilverStripe\Forms\HeaderField;
-use SilverStripe\Forms\HiddenField;
 use SilverStripe\Forms\Tab;
 use SilverStripe\Forms\TabSet;
 use SilverStripe\Forms\TextField;
@@ -427,7 +426,6 @@ class MenuSet extends DataObject implements PermissionProvider
         }
 
         $menuItemsTab->push($itemsField);
-        $menuItemsTab->push(HiddenField::create('ID', false));
 
         $this->extend('updateCMSFields', $fields);
         return $fields;
